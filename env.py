@@ -30,7 +30,7 @@ class ClutteredPushGrasp:
         # define environment
         self.physicsClient = p.connect(p.GUI if self.vis else p.DIRECT)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
-        p.setGravity(0, 0, -10)
+        p.setGravity(0, 0, -9.81)
         self.planeID = p.loadURDF("plane.urdf")
 
         self.robot.load()
@@ -45,17 +45,39 @@ class ClutteredPushGrasp:
         self.yawId = p.addUserDebugParameter("yaw", -np.pi/2, np.pi/2, np.pi/2)
         self.gripper_opening_length_control = p.addUserDebugParameter("gripper_opening_length", 0, 0.085, 0.04)
 
-        self.boxID = p.loadURDF("./urdf/skew-box-button.urdf",
-                                [0.0, 0.0, 0.0],
+        self.boxID = p.loadURDF("./urdf/simple-table.urdf",
+                                [0.0, 0.0, 0.0])
                                 # p.getQuaternionFromEuler([0, 1.5706453, 0]),
-                                p.getQuaternionFromEuler([0, 0, 0]),
-                                useFixedBase=True,
-                                flags=p.URDF_MERGE_FIXED_LINKS | p.URDF_USE_SELF_COLLISION)
+                                # p.getQuaternionFromEuler([0, 0, 0]),
+                                # useFixedBase=True,
+                                # flags=p.URDF_MERGE_FIXED_LINKS | p.URDF_USE_SELF_COLLISION)
+
+        # Load the puck URDF
+        # Adjust the basePosition so the puck is on the table. For example, if the table height is 0.75m, you might set z to 0.76m.
+        self.puckId = p.loadURDF("./urdf/puck.urdf", basePosition=[0, 0.1, 0.25])
+
+        table_size = (0.5, 0.5)  # Length and width of the table
+        table_height = 0.03 + 0.05 / 2
+
+        target_position = self.random_position_on_table(0.5,0.5, table_height)
+
+        # Create a visual shape (red sphere) for the target
+        target_visual_shape = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.02, rgbaColor=[1, 0, 0, 1])
+        self.target_body = p.createMultiBody(baseMass=0, baseVisualShapeIndex=target_visual_shape, basePosition=target_position)
+
+        # Optionally, you can adjust friction properties to make the puck slide more realistically
+        p.changeDynamics(self.puckId , -1, lateralFriction=0.5)
+
 
         # For calculating the reward
-        self.box_opened = False
-        self.btn_pressed = False
-        self.box_closed = False
+        self.is_success = False
+
+    # Function to generate a random position on the table
+    def random_position_on_table(self, table_length, table_width, table_height):
+        x = np.random.uniform(-table_length / 2, table_length / 2)
+        y = np.random.uniform(-table_width / 2, table_width / 2)
+        z = table_height  # Height of the table surface
+        return [x, y, z]
 
     def step_simulation(self):
         """
@@ -92,25 +114,27 @@ class ClutteredPushGrasp:
             self.step_simulation()
 
         reward = self.update_reward()
-        done = True if reward == 1 else False
-        info = dict(box_opened=self.box_opened, btn_pressed=self.btn_pressed, box_closed=self.box_closed)
+
+        if reward < 0.05:
+            self.is_success = True
+
+        done = True if self.is_success==True else False
+        info = dict(is_success=self.is_success)
         return self.get_observation(), reward, done, info
+
+    # Function to calculate Euclidean distance
+    def euclidean_distance(self, position1, position2):
+        return np.sqrt((position1[0] - position2[0])**2 + (position1[1] - position2[1])**2 + (position1[2] - position2[2])**2)
+
 
     def update_reward(self):
         reward = 0
-        if not self.box_opened:
-            if p.getJointState(self.boxID, 1)[0] > 1.9:
-                self.box_opened = True
-                print('Box opened!')
-        elif not self.btn_pressed:
-            if p.getJointState(self.boxID, 0)[0] < - 0.02:
-                self.btn_pressed = True
-                print('Btn pressed!')
-        else:
-            if p.getJointState(self.boxID, 1)[0] < 0.1:
-                print('Box closed!')
-                self.box_closed = True
-                reward = 1
+        puck_position, _ = p.getBasePositionAndOrientation(self.puckId)
+        target_position, _ = p.getBasePositionAndOrientation(self.target_body)
+        
+        distance = self.euclidean_distance(puck_position, target_position)
+        reward = -distance
+        print("Current reward:", reward)
         return reward
 
     def get_observation(self):
@@ -124,13 +148,18 @@ class ClutteredPushGrasp:
 
         return obs
 
-    def reset_box(self):
-        p.setJointMotorControl2(self.boxID, 0, p.POSITION_CONTROL, force=1)
-        p.setJointMotorControl2(self.boxID, 1, p.VELOCITY_CONTROL, force=0)
+    # def reset_box(self):
+    #     p.setJointMotorControl2(self.boxID, 0, p.POSITION_CONTROL, force=1)
+    #     p.setJointMotorControl2(self.boxID, 1, p.VELOCITY_CONTROL, force=0)
 
     def reset(self):
         self.robot.reset()
-        self.reset_box()
+        self.is_success = False
+        # self.reset_box()
+        new_target_position_target = self.random_position_on_table(0.5,0.5, 0.03 + 0.05 / 2)
+        new_target_position_puck = self.random_position_on_table(0.5,0.5, 0.03 + 0.05 / 2) 
+        p.resetBasePositionAndOrientation(self.target_body, new_target_position_target, [0, 0, 0, 1])
+        p.resetBasePositionAndOrientation(self.puckId, new_target_position_puck, [0, 0, 0, 1])
         return self.get_observation()
 
     def close(self):

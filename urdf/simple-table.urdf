@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<robot name="simple_table">
+
+  <!-- Base Link -->
+  <link name="table_top">
+    <visual>
+      <geometry>
+        <box size="0.6 0.6 0.05"/> <!-- Length, Width, Height -->
+      </geometry>
+
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.6 0.6 0.05"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="1000"/> <!-- Mass in kg -->
+      <inertia ixx="0.1" ixy="0" ixz="0" iyy="0.1" iyz="0" izz="0.1"/>
+    </inertial>
+  </link>
+
+</robot>
+
+
+  <!-- Legs -->
+  <!-- Assuming all legs have the same dimensions and properties -->
+  <!-- Only specifying one leg and its position, replicate for other legs -->
+  <!-- <link name="leg1">
+    <visual>
+      <geometry>
+        <cylinder radius="0.05" length="0.7"/> <!-- Radius, Length -->
+      </geometry>
+      <material name="metal">
+        <color rgba="0.5 0.5 0.5 1"/> <!-- Grey color -->
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.05" length="0.7"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="2"/> <!-- Mass in kg -->
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.02"/>
+    </inertial>
+  </link>
+
+  <!-- Joints (assuming fixed joints for simplicity) -->
+  <!-- Joint for leg1 to table_top -->
+  <joint name="leg1_joint" type="fixed">
+    <parent link="table_top"/>
+    <child link="leg1"/>
+    <origin xyz="0.45 0.2 -0.375" rpy="0 0 0"/> <!-- Adjust the position accordingly -->
+  </joint>
+ -->
+  <!-- Repeat the <link> and <joint> sections for the other three legs, adjusting the origin xyz for positioning -->
+
